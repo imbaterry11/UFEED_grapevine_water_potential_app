@@ -26,7 +26,18 @@ library(htmltools)
 # Data loading and preparation
 # -----------------------------------------------------------------------------
 
-DATA_PATH <- Sys.getenv("UFEED_DATA_PATH", unset = "all_data_application.csv")
+DATA_URL <- "https://nextcloud.inrae.fr/public.php/dav/files/bpxB7kscDkz37fT/?accept=zip"
+
+DATA_PATH <- "all_data_application.csv"
+
+download.file(
+  url = DATA_URL,
+  destfile = DATA_PATH,
+  mode = "wb",
+  quiet = FALSE
+)
+
+all_data <- readr::read_csv(DATA_PATH, show_col_types = FALSE)
 
 format_time_label <- function(x) {
   dplyr::case_when(
