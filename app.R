@@ -208,7 +208,7 @@ ui <- fluidPage(
           label = "Irrigation",
           choices = c(
             "Non-irrigated" = "0",
-            "Irrigated" = "1"
+            "Irrigated (rought estimation)" = "1"
           ),
           selected = "0"
         ),
