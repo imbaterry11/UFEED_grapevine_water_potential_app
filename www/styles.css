@@ -55,12 +55,26 @@ html, body {
 .brand-logos {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
+  gap: 16px;
+  padding: 10px 14px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+
+.brand-logo-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  border-radius: 14px;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.brand-logo-link:hover {
+  transform: translateY(-1px);
+  opacity: 0.86;
 }
 
 .brand-logo {
@@ -69,20 +83,19 @@ html, body {
 }
 
 .brand-logo-ufeed {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
 }
 
 .brand-logo-inrae {
-  width: 118px;
-  max-height: 52px;
+  width: 155px;
+  max-height: 68px;
 }
 
 .brand-logo-egfv {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
 }
-
 .brand-mark {
   display: none;
 }
@@ -470,10 +483,22 @@ html, body {
   .brand-logos {
     max-width: 100%;
     flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .brand-logo-ufeed {
+    width: 60px;
+    height: 60px;
   }
 
   .brand-logo-inrae {
-    width: 108px;
+    width: 130px;
+    max-height: 58px;
+  }
+
+  .brand-logo-egfv {
+    width: 60px;
+    height: 60px;
   }
 }
 
@@ -512,5 +537,70 @@ html, body {
   border-radius: 8px;
   padding: 3px 6px;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+
+.app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1200;
+
+  padding: 10px 18px;
+  text-align: center;
+
+  background: rgba(255, 255, 255, 0.78);
+  border-top: 1px solid rgba(148, 163, 184, 0.32);
+  backdrop-filter: blur(14px);
+
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 -8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.app-footer a {
+  color: #0f766e;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  color: #134e4a;
+  text-decoration: underline;
+}
+
+/* Prevent the fixed footer from covering page content */
+.app-shell {
+  padding-bottom: 72px;
+}
+
+
+.button-row .btn,
+.button-row .primary-button,
+.button-row .ghost-button,
+.button-row .shiny-download-link {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px;
+
+  width: 100%;
+  height: 42px;
+  padding: 0 14px !important;
+
+  line-height: 1 !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+}
+
+.button-row .shiny-download-link i,
+.button-row .shiny-download-link .fa,
+.button-row .shiny-download-link .glyphicon {
+  margin: 0 !important;
+  line-height: 1 !important;
+  position: static !important;
+  top: auto !important;
 }
 

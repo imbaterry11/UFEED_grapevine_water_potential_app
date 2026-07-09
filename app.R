@@ -26,9 +26,20 @@ library(htmltools)
 # Data loading and preparation
 # -----------------------------------------------------------------------------
 
-DATA_URL <- "https://nextcloud.inrae.fr/public.php/dav/files/bpxB7kscDkz37fT/?accept=zip"
+DATA_URL <- Sys.getenv(
+  "UFEED_DATA_URL",
+  unset = "https://nextcloud.inrae.fr/public.php/dav/files/bpxB7kscDkz37fT/?accept=zip"
+)
 
-DATA_PATH <- "all_data_application.csv"
+DATA_PATH <- Sys.getenv(
+  "UFEED_DATA_PATH",
+  unset = "all_data_application.csv"
+)
+
+CURRENT_SOURCE <- Sys.getenv(
+  "UFEED_CURRENT_SOURCE",
+  unset = "2026"
+)
 
 download.file(
   url = DATA_URL,
@@ -36,8 +47,6 @@ download.file(
   mode = "wb",
   quiet = FALSE
 )
-
-all_data <- readr::read_csv(DATA_PATH, show_col_types = FALSE)
 
 format_time_label <- function(x) {
   dplyr::case_when(
@@ -50,6 +59,29 @@ mean_or_na <- function(x) {
   if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
 }
 
+min_or_na <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) NA_real_ else min(x)
+}
+
+max_or_na <- function(x) {
+  x <- x[!is.na(x)]
+  if (length(x) == 0) NA_real_ else max(x)
+}
+
+format_time_band <- function(min_time, max_time) {
+  dplyr::case_when(
+    is.na(min_time) & is.na(max_time) ~ "Predawn / not applicable",
+    min_time == max_time ~ format_time_label(min_time),
+    TRUE ~ paste0(format_time_label(min_time), "-", format_time_label(max_time))
+  )
+}
+
+hex_to_rgba <- function(hex, alpha = 0.16) {
+  rgb <- grDevices::col2rgb(hex)
+  sprintf("rgba(%d, %d, %d, %.2f)", rgb[1, 1], rgb[2, 1], rgb[3, 1], alpha)
+}
+
 load_ufeed_data <- function(path) {
   if (!file.exists(path)) {
     stop(
@@ -59,14 +91,14 @@ load_ufeed_data <- function(path) {
       call. = FALSE
     )
   }
-
+  
   dat <- readr::read_csv(path, show_col_types = FALSE)
-
+  
   required_cols <- c(
-    "Date", "lon", "lat", "y_pred", "ps_type", "irrigation",
+    "Date", "lon", "lat", "y_pred", "ps_type",
     "time_measured", "T2M", "T2M_MAX", "T2M_MIN", "source"
   )
-
+  
   missing_cols <- setdiff(required_cols, names(dat))
   if (length(missing_cols) > 0) {
     stop(
@@ -75,34 +107,33 @@ load_ufeed_data <- function(path) {
       call. = FALSE
     )
   }
-
+  
+  if (!("y_pred_NN" %in% names(dat))) {
+    dat$y_pred_NN <- NA_real_
+  }
+  
   dat %>%
     mutate(
       Date = as.Date(Date),
       lon = as.numeric(lon),
       lat = as.numeric(lat),
       y_pred = as.numeric(y_pred),
+      y_pred_NN = as.numeric(y_pred_NN),
       ps_type = as.integer(ps_type),
-      irrigation = as.integer(irrigation),
       time_measured = as.numeric(time_measured),
       T2M = as.numeric(T2M),
       T2M_MAX = as.numeric(T2M_MAX),
       T2M_MIN = as.numeric(T2M_MIN),
       source = as.character(source),
       ps_label = case_when(
-        ps_type == 0 ~ "Predawn water potential (Ψpd)",
-        ps_type == 1 ~ "Midday stem water potential (Ψmd)",
+        ps_type == 0 ~ "Predawn water potential (pd)",
+        ps_type == 1 ~ "Midday stem water potential (md)",
         TRUE ~ paste("Unknown type", ps_type)
-      ),
-      irrigation_label = case_when(
-        irrigation == 0 ~ "Non-irrigated",
-        irrigation == 1 ~ "Irrigated",
-        TRUE ~ paste("Unknown irrigation", irrigation)
       ),
       time_label = format_time_label(time_measured),
       location_id = paste0(round(lon, 6), " | ", round(lat, 6))
     ) %>%
-    filter(!is.na(Date), !is.na(lon), !is.na(lat), !is.na(y_pred))
+    filter(!is.na(Date), !is.na(lon), !is.na(lat), !is.na(y_pred) | !is.na(y_pred_NN))
 }
 
 ufeed_data <- load_ufeed_data(DATA_PATH)
@@ -114,7 +145,7 @@ time_choices <- c(
 )
 time_choices <- time_choices[time_choices %in% unique(ufeed_data$time_label)]
 
-x_limit_data <- ufeed_data %>% filter(source == "2026")
+x_limit_data <- ufeed_data %>% filter(source == CURRENT_SOURCE)
 if (nrow(x_limit_data) == 0) {
   x_limit_data <- ufeed_data
 }
@@ -124,7 +155,7 @@ x_max <- max(x_limit_data$Date, na.rm = TRUE)
 all_locations <- ufeed_data %>%
   distinct(location_id, lon, lat)
 
-default_location_id <- all_locations$location_id[1]
+default_location_id <- all_locations$location_id[22]
 
 # -----------------------------------------------------------------------------
 # UI
@@ -135,19 +166,52 @@ ui <- fluidPage(
     tags$meta(name = "viewport", content = "width=device-width, initial-scale=1"),
     tags$link(rel = "stylesheet", type = "text/css", href = "styles.css")
   ),
-
+  
   div(
     class = "app-shell",
-
+    
     div(
       class = "topbar",
       div(
         class = "brand-block",
         div(
           class = "brand-logos",
-          tags$img(src = "UFEED.png", class = "brand-logo brand-logo-ufeed", alt = "UFEED"),
-          tags$img(src = "Logo-INRAE_Transparent.svg.png", class = "brand-logo brand-logo-inrae", alt = "INRAE"),
-          tags$img(src = "Activites-scientifiques.png", class = "brand-logo brand-logo-egfv", alt = "UMR EGFV")
+          
+          tags$a(
+            href = "https://github.com/imbaterry11/UFEED",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            class = "brand-logo-link",
+            tags$img(
+              src = "UFEED.png",
+              class = "brand-logo brand-logo-ufeed",
+              alt = "UFEED"
+            )
+          ),
+          
+          tags$a(
+            href = "https://www.inrae.fr/",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            class = "brand-logo-link",
+            tags$img(
+              src = "Logo-INRAE_Transparent.svg.png",
+              class = "brand-logo brand-logo-inrae",
+              alt = "INRAE"
+            )
+          ),
+          
+          tags$a(
+            href = "https://egfv.bordeaux-aquitaine.hub.inrae.fr/",
+            target = "_blank",
+            rel = "noopener noreferrer",
+            class = "brand-logo-link",
+            tags$img(
+              src = "Activites-scientifiques.png",
+              class = "brand-logo brand-logo-egfv",
+              alt = "UMR EGFV"
+            )
+          )
         ),
         div(
           div(class = "brand-title", "UFEED Grapevine Water Potential Explorer")
@@ -156,7 +220,7 @@ ui <- fluidPage(
       ),
       div(class = "today-pill", textOutput("today_text", inline = TRUE))
     ),
-
+    
     div(
       class = "hero-card",
       div(
@@ -164,7 +228,7 @@ ui <- fluidPage(
         h1("Visualize grapevine water potential prediction"),
         p(
           "Explore predicted grapevine predawn and midday stem water potential by source, ",
-          "irrigation regime, measurement time, and location. Click one map point to visualize ",
+          "model choice for the current season, and location. Click one map point to visualize ",
           "one location."
         )
       ),
@@ -175,15 +239,15 @@ ui <- fluidPage(
         div(class = "metric-card", div(class = "metric-value", textOutput("axis_range", inline = TRUE)), div(class = "metric-label", "Temporal range"))
       )
     ),
-
+    
     div(
       class = "layout-grid",
-
+      
       tags$aside(
         class = "filters-panel",
         div(class = "panel-title", "Filters"),
-        div(class = "panel-note", "Selections update both the map and water-potential curve. Only one location can be active at a time."),
-
+        div(class = "panel-note", "Selections update both the map and water potential curve. Only one location can be selected."),
+        
         selectizeInput(
           inputId = "source",
           label = "Data source",
@@ -192,52 +256,67 @@ ui <- fluidPage(
           multiple = TRUE,
           options = list(plugins = list("remove_button"), placeholder = "Select one or more sources")
         ),
-
+        
         radioButtons(
           inputId = "ps_type",
-          label = "Water-potential type",
+          label = "Water potential type",
           choices = c(
-            "Predawn (Ψpd)" = "0",
-            "Midday stem (Ψmd)" = "1"
+            "Predawn (pd)" = "0",
+            "Midday stem (md)" = "1"
           ),
           selected = "1"
         ),
-
+        
         radioButtons(
-          inputId = "irrigation",
-          label = "Irrigation",
+          inputId = "model_type",
+          label = "Current-season model",
           choices = c(
-            "Non-irrigated" = "0"
-            # "Irrigated (rought estimation)" = "1"
+            "Ensemble model" = "ensemble",
+            "NN model" = "nn"
           ),
-          selected = "0"
+          selected = "ensemble"
         ),
-
+        div(
+          class = "panel-note",
+          "The NN model theoretically has better extrapolation capacity under extreme conditions, but the ensemble model has higher accuracy in model training. This option only affects current-season data; historical data always uses the ensemble model."
+        ),
+        
+        radioButtons(
+          inputId = "show_historical",
+          label = "Historical data",
+          choices = c(
+            "Show historical data" = "yes",
+            "Hide historical data" = "no"
+          ),
+          selected = "yes"
+        ),
+        
         selectizeInput(
           inputId = "time_measured",
-          label = "Measurement time",
+          label = "Measurement time band",
           choices = time_choices,
           selected = time_choices,
           multiple = TRUE,
-          options = list(plugins = list("remove_button"), placeholder = "Select time(s)")
+          options = list(plugins = list("remove_button"), placeholder = "Select time(s) for the band")
         ),
-
+        
         div(
           class = "button-row",
           actionButton("clear_locations", "Reset location", class = "ghost-button"),
-          actionButton("reset_filters", "Reset filters", class = "primary-button")
+          actionButton("reset_filters", "Reset filters", class = "primary-button"),
+          downloadButton("download_all_data", "Download all data", class = "ghost-button")
         ),
-
+        
         div(
           class = "selection-status",
           div(class = "status-label", "Current map selection"),
           textOutput("location_status")
         )
       ),
-
+      
       tags$main(
         class = "content-panel",
-
+        
         div(
           class = "viz-card map-card",
           div(
@@ -250,7 +329,7 @@ ui <- fluidPage(
           ),
           leafletOutput("site_map", height = "520px")
         ),
-
+        
         div(
           class = "viz-card plot-card",
           div(
@@ -263,6 +342,14 @@ ui <- fluidPage(
           ),
           plotlyOutput("water_plot", height = "520px")
         )
+      ),
+      tags$footer(
+        class = "app-footer",
+        span("Beta version. If you have any questions, please email "),
+        tags$a(
+          href = "mailto:hongrui.wang@inrae.fr",
+          "Hongrui Wang"
+        )
       )
     )
   )
@@ -274,88 +361,104 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   selected_locations <- reactiveVal(default_location_id)
-
+  
   output$today_text <- renderText({
     paste("Today:", format(Sys.Date(), "%b %d, %Y"))
   })
-
+  
   output$n_locations <- renderText({
     format(nrow(all_locations), big.mark = ",")
   })
-
+  
   output$n_records <- renderText({
     format(nrow(ufeed_data), big.mark = ",")
   })
-
+  
   output$axis_range <- renderText({
-    paste0(format(x_min, "%b %d"), "–", format(x_max, "%b %d"))
+    paste0(format(x_min, "%b %d"), " - ", format(x_max, "%b %d"))
   })
-
+  
+  output$download_all_data <- downloadHandler(
+    filename = function() {
+      paste0("all_data_application_", format(Sys.Date(), "%Y%m%d"), ".csv")
+    },
+    content = function(file) {
+      file.copy(DATA_PATH, file, overwrite = TRUE)
+    },
+    contentType = "text/csv"
+  )
+  
   observeEvent(input$reset_filters, {
     updateSelectizeInput(session, "source", selected = source_choices)
     updateRadioButtons(session, "ps_type", selected = "1")
-    updateRadioButtons(session, "irrigation", selected = "0")
+    updateRadioButtons(session, "model_type", selected = "ensemble")
+    updateRadioButtons(session, "show_historical", selected = "yes")
     updateSelectizeInput(session, "time_measured", selected = time_choices)
     selected_locations(default_location_id)
   })
-
+  
   observeEvent(input$clear_locations, {
     selected_locations(default_location_id)
   })
-
+  
   filtered_for_controls <- reactive({
-    req(input$source, input$time_measured, input$ps_type, input$irrigation)
-
-    ufeed_data %>%
+    req(input$source, input$time_measured, input$ps_type, input$show_historical)
+    
+    dat <- ufeed_data %>%
       filter(
         source %in% input$source,
         ps_type == as.integer(input$ps_type),
-        irrigation == as.integer(input$irrigation),
         time_label %in% input$time_measured
       )
+    
+    if (identical(input$show_historical, "no")) {
+      dat <- dat %>% filter(source == CURRENT_SOURCE)
+    }
+    
+    dat
   })
-
+  
   visible_location_data <- reactive({
     filtered_for_controls() %>%
       distinct(location_id, lon, lat) %>%
       arrange(lat, lon)
   })
-
+  
   observeEvent(input$site_map_marker_click, {
     click <- input$site_map_marker_click
     req(click$id)
-
+    
     selected_locations(click$id)
   })
-
+  
   observe({
     visible_ids <- visible_location_data()$location_id
     current <- selected_locations()
-
+    
     if (length(visible_ids) == 0) {
       return()
     }
-
+    
     if (length(current) != 1 || !(current %in% visible_ids)) {
       selected_locations(visible_ids[1])
     }
   })
-
+  
   output$location_status <- renderText({
     selected_id <- selected_locations()[1]
     loc <- all_locations %>% filter(location_id == selected_id) %>% slice(1)
-
+    
     if (nrow(loc) == 0) {
       "No matching location is available under the current filters."
     } else {
       paste0("Selected location: Lon ", round(loc$lon[1], 4), ", Lat ", round(loc$lat[1], 4), ".")
     }
   })
-
+  
   output$visible_points <- renderText({
     paste(nrow(visible_location_data()), "locations")
   })
-
+  
   output$site_map <- renderLeaflet({
     leaflet(
       options = leafletOptions(
@@ -371,7 +474,7 @@ server <- function(input, output, session) {
         providers$CartoDB.Positron,
         group = "Clean light"
       ) %>%
-
+      
       addProviderTiles(
         providers$Esri.WorldTopoMap,
         group = "Terrain"
@@ -397,7 +500,7 @@ server <- function(input, output, session) {
           metric = TRUE,
           imperial = FALSE
         )
-      ) 
+      )
     # %>%
     #   addControl(
     #     html = htmltools::HTML(
@@ -409,14 +512,14 @@ server <- function(input, output, session) {
     #     position = "bottomright"
     #   )
   })
-
+  
   observe({
     pts <- visible_location_data()
     selected <- selected_locations()
-
+    
     proxy <- leafletProxy("site_map") %>%
       clearMarkers()
-
+    
     if (nrow(pts) == 0) {
       proxy %>% addControl(
         html = "<div class='map-empty'>No locations match the current filters.</div>",
@@ -424,7 +527,7 @@ server <- function(input, output, session) {
       )
       return()
     }
-
+    
     pts <- pts %>%
       mutate(
         is_selected = location_id %in% selected,
@@ -443,7 +546,7 @@ server <- function(input, output, session) {
           "</div>"
         )
       )
-
+    
     proxy <- proxy %>%
       addCircleMarkers(
         data = pts,
@@ -460,7 +563,7 @@ server <- function(input, output, session) {
         label = pts$label_text,
         options = pathOptions(pane = "markerPane")
       )
-
+    
     if (nrow(pts) == 1) {
       proxy %>% setView(lng = pts$lon[1], lat = pts$lat[1], zoom = 5)
     } else {
@@ -473,45 +576,65 @@ server <- function(input, output, session) {
         )
     }
   })
-
+  
   plot_raw_data <- reactive({
+    req(input$model_type)
     selected <- selected_locations()[1]
-
+    
     filtered_for_controls() %>%
       filter(location_id == selected) %>%
-      filter(Date >= x_min, Date <= x_max)
+      filter(Date >= x_min, Date <= x_max) %>%
+      mutate(
+        use_nn_model = source == CURRENT_SOURCE & input$model_type == "nn" & !is.na(y_pred_NN),
+        y_plot = if_else(use_nn_model, y_pred_NN, y_pred),
+        model_label = case_when(
+          source != CURRENT_SOURCE ~ "Historical data",
+          use_nn_model ~ "NN model",
+          TRUE ~ "Ensemble model"
+        )
+      ) %>%
+      filter(!is.na(y_plot))
   })
-
+  
   plot_data <- reactive({
     plot_raw_data() %>%
-      group_by(Date, source, time_label, ps_label, irrigation_label, location_id, lon, lat) %>%
+      group_by(Date, source, ps_label, model_label, location_id, lon, lat) %>%
       summarise(
-        y_pred = mean(y_pred, na.rm = TRUE),
+        y_pred = mean(y_plot, na.rm = TRUE),
+        y_min_band = min(y_plot, na.rm = TRUE),
+        y_max_band = max(y_plot, na.rm = TRUE),
+        time_min = min_or_na(time_measured),
+        time_max = max_or_na(time_measured),
         T2M = mean_or_na(T2M),
         T2M_MAX = mean_or_na(T2M_MAX),
         T2M_MIN = mean_or_na(T2M_MIN),
         n_records = n(),
+        n_times = n_distinct(time_label),
         .groups = "drop"
       ) %>%
-      arrange(source, time_label, Date)
+      mutate(
+        time_band_label = format_time_band(time_min,time_max)
+      ) %>%
+      arrange(source, Date)
   })
-
+  
   output$plot_subtitle <- renderText({
-    type_label <- if (identical(input$ps_type, "0")) "Ψpd" else "Ψmd"
-    irr_label <- if (identical(input$irrigation, "0")) "non-irrigated" else "irrigated"
+    type_label <- if (identical(input$ps_type, "0")) "pd" else "md"
+    model_label <- if (identical(input$model_type, "nn")) "current-season NN model" else "current-season ensemble model"
+    history_label <- if (identical(input$show_historical, "yes")) "historical data shown" else "historical data hidden"
     selected_id <- selected_locations()[1]
     loc <- all_locations %>% filter(location_id == selected_id) %>% slice(1)
-
+    
     if (nrow(loc) == 0) {
-      paste("Selected location for", type_label, "under", irr_label, "conditions")
+      paste("Selected location for", type_label, "with", model_label, "and", history_label)
     } else {
       paste0(
         "Selected location: Lon ", round(loc$lon[1], 4), ", Lat ", round(loc$lat[1], 4),
-        " · ", type_label, " · ", irr_label
+        " ÃÂ· ", type_label, " ÃÂ· ", model_label, " ÃÂ· ", history_label
       )
     }
   })
-
+  
   output$water_plot <- renderPlotly({
     dat <- plot_data()
     
@@ -523,7 +646,8 @@ server <- function(input, output, session) {
     source_palette <- c(
       "2026" = "#2563eb",
       "2025" = "#9333ea",
-      "2015-2025 mean" = "#0f766e"
+      "2015-2025 mean" = "#0f766e",
+      "2016-2025 mean" = "#0f766e"
     )
     fallback_palette <- c("#2563eb", "#0f766e", "#9333ea", "#ea580c", "#475569", "#be123c")
     missing_sources <- setdiff(source_levels, names(source_palette))
@@ -531,20 +655,11 @@ server <- function(input, output, session) {
       source_palette[missing_sources] <- rep(fallback_palette, length.out = length(missing_sources))
     }
     
-    time_levels <- sort(unique(dat$time_label))
-    dash_map <- c(
-      "Predawn / not applicable" = "solid",
-      "12:00" = "dot",
-      "14:00" = "solid",
-      "16:00" = "dash"
-    )
-    missing_times <- setdiff(time_levels, names(dash_map))
-    if (length(missing_times) > 0) {
-      dash_map[missing_times] <- rep(c("solid", "dot", "dash", "longdash"), length.out = length(missing_times))
-    }
+    source_dash_map <- setNames(rep("solid", length(source_levels)), source_levels)
+    source_dash_map[source_levels != CURRENT_SOURCE] <- "dash"
     
-    y_min <- min(dat$y_pred, na.rm = TRUE)
-    y_max <- max(dat$y_pred, na.rm = TRUE)
+    y_min <- min(dat$y_min_band, na.rm = TRUE)
+    y_max <- max(dat$y_max_band, na.rm = TRUE)
     y_padding <- max(0.05, abs(y_max - y_min) * 0.08)
     y_min <- y_min - y_padding
     y_max <- y_max + y_padding
@@ -572,28 +687,51 @@ server <- function(input, output, session) {
         )
     }
     
-    dat <- dat %>%
-      mutate(series_id = paste(source, time_label, sep = " · "))
-    
-    for (sid in unique(dat$series_id)) {
-      d <- dat %>% filter(series_id == sid)
-      src <- unique(d$source)[1]
-      tm <- unique(d$time_label)[1]
+    for (src in source_levels) {
+      d <- dat %>% filter(source == src) %>% arrange(Date)
+      line_color <- unname(source_palette[src])
+      
+      band_hover_text <- paste0(
+        "<b>", htmlEscape(src), " selected-time band</b>",
+        "<br>Date: ", format(d$Date, "%Y-%m-%d"),
+        "<br>Water potential band: ", round(d$y_min_band, 3), " to ", round(d$y_max_band, 3),
+        "<br>Mean predicted water potential: ", round(d$y_pred, 3),
+        "<br>Time band: ", htmlEscape(d$time_band_label),
+        "<br>Model: ", htmlEscape(d$model_label),
+        "<br>Location: Lon ", round(d$lon, 4), ", Lat ", round(d$lat, 4)
+      )
+      
+      p <- p %>%
+        add_trace(
+          x = c(d$Date, rev(d$Date)),
+          y = c(d$y_min_band, rev(d$y_max_band)),
+          type = "scatter",
+          mode = "lines",
+          fill = "toself",
+          fillcolor = hex_to_rgba(line_color, 0.16),
+          line = list(color = "rgba(0,0,0,0)", width = 0),
+          text = c(band_hover_text, rev(band_hover_text)),
+          hoverinfo = "text",
+          name = paste(src, "selected-time band"),
+          showlegend = FALSE,
+          inherit = FALSE
+        )
       
       hover_text <- paste0(
         "<b>", htmlEscape(unique(d$ps_label)[1]), "</b>",
         "<br>Date: ", format(d$Date, "%Y-%m-%d"),
-        "<br>Predicted water potential: ", round(d$y_pred, 3),
+        "<br>Mean predicted water potential: ", round(d$y_pred, 3),
+        # "<br>Selected-time band: ", round(d$y_min_band, 3), " to ", round(d$y_max_band, 3),
         "<br>Source: ", htmlEscape(src),
-        "<br>Time: ", htmlEscape(tm),
-        "<br>Irrigation: ", htmlEscape(unique(d$irrigation_label)[1]),
+        "<br>Time band: ", htmlEscape(d$time_band_label),
+        "<br>Model: ", htmlEscape(d$model_label),
         "<br>Location: Lon ", round(d$lon, 4), ", Lat ", round(d$lat, 4),
         # "<br>Records used: ", d$n_records,
-        "<br>T2M: ", ifelse(is.na(d$T2M), "NA", paste0(round(d$T2M, 1), " °C")),
+        "<br>T2M: ", ifelse(is.na(d$T2M), "NA", paste0(round(d$T2M, 1), " ÃÂ°C")),
         "<br>T2M max/min: ",
-        ifelse(is.na(d$T2M_MAX), "NA", paste0(round(d$T2M_MAX, 1), " °C")),
+        ifelse(is.na(d$T2M_MAX), "NA", paste0(round(d$T2M_MAX, 1), " ÃÂ°C")),
         " / ",
-        ifelse(is.na(d$T2M_MIN), "NA", paste0(round(d$T2M_MIN, 1), " °C"))
+        ifelse(is.na(d$T2M_MIN), "NA", paste0(round(d$T2M_MIN, 1), " ÃÂ°C"))
       )
       
       p <- p %>%
@@ -603,13 +741,13 @@ server <- function(input, output, session) {
           y = ~y_pred,
           type = "scatter",
           mode = "lines",
-          name = sid,
+          name = src,
           text = hover_text,
           hoverinfo = "text",
           line = list(
-            color = unname(source_palette[src]),
+            color = line_color,
             width = 2.8,
-            dash = unname(dash_map[tm])
+            dash = unname(source_dash_map[src])
           ),
           legendgroup = src,
           inherit = FALSE
@@ -685,7 +823,7 @@ server <- function(input, output, session) {
         
         yaxis = list(
           title = list(
-            text = "Predicted grapevine water potential",
+            text = "Predicted grapevine water potential (MPa)",
             font = list(color = "black")
           ),
           range = c(y_min, y_max),
@@ -711,6 +849,8 @@ server <- function(input, output, session) {
       ) %>%
       config(displaylogo = FALSE, responsive = TRUE)
   })
+  
+  
 }
 
 shinyApp(ui = ui, server = server)
