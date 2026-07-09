@@ -10,7 +10,7 @@ id = "019ef0d6-c595-c549-7aa4-dba04fc907ae"
 dashboard_url = "https://connect.posit.cloud/plant-physiology-modeling/content/019ef0d6-c595-c549-7aa4-dba04fc907ae"
 direct_url = "https://019ef0d6-c595-c549-7aa4-dba04fc907ae.share.connect.posit.cloud"
 logs_url = "https://connect.posit.cloud/plant-physiology-modeling/content/019ef0d6-c595-c549-7aa4-dba04fc907ae/history"
-deployed_at = "2026-07-09T13:19:57.859Z"
+deployed_at = "2026-07-09T17:06:03.367Z"
 files = [
     ".posit/publish/UFEED_grapevine_water_potentia-4GBG.toml",
     ".posit/publish/deployments/deployment-9VU3.toml",

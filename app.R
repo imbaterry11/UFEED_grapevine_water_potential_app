@@ -727,11 +727,11 @@ server <- function(input, output, session) {
         "<br>Model: ", htmlEscape(d$model_label),
         "<br>Location: Lon ", round(d$lon, 4), ", Lat ", round(d$lat, 4),
         # "<br>Records used: ", d$n_records,
-        "<br>T2M: ", ifelse(is.na(d$T2M), "NA", paste0(round(d$T2M, 1), " ÃÂ°C")),
+        "<br>T2M: ", ifelse(is.na(d$T2M), "NA", paste0(round(d$T2M, 1), " °C")),
         "<br>T2M max/min: ",
-        ifelse(is.na(d$T2M_MAX), "NA", paste0(round(d$T2M_MAX, 1), " ÃÂ°C")),
+        ifelse(is.na(d$T2M_MAX), "NA", paste0(round(d$T2M_MAX, 1), "°C")),
         " / ",
-        ifelse(is.na(d$T2M_MIN), "NA", paste0(round(d$T2M_MIN, 1), " ÃÂ°C"))
+        ifelse(is.na(d$T2M_MIN), "NA", paste0(round(d$T2M_MIN, 1), " °C"))
       )
       
       p <- p %>%
