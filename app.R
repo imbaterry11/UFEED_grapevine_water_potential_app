@@ -111,6 +111,10 @@ load_ufeed_data <- function(path) {
   if (!("y_pred_NN" %in% names(dat))) {
     dat$y_pred_NN <- NA_real_
   }
+
+  if (!("y_pred_stress" %in% names(dat))) {
+    dat$y_pred_stress <- NA_real_
+  }
   
   dat %>%
     mutate(
@@ -119,6 +123,7 @@ load_ufeed_data <- function(path) {
       lat = as.numeric(lat),
       y_pred = as.numeric(y_pred),
       y_pred_NN = as.numeric(y_pred_NN),
+      y_pred_stress = as.numeric(y_pred_stress),
       ps_type = as.integer(ps_type),
       time_measured = as.numeric(time_measured),
       T2M = as.numeric(T2M),
@@ -133,7 +138,7 @@ load_ufeed_data <- function(path) {
       time_label = format_time_label(time_measured),
       location_id = paste0(round(lon, 6), " | ", round(lat, 6))
     ) %>%
-    filter(!is.na(Date), !is.na(lon), !is.na(lat), !is.na(y_pred) | !is.na(y_pred_NN))
+    filter(!is.na(Date), !is.na(lon), !is.na(lat), !is.na(y_pred) | !is.na(y_pred_NN) | !is.na(y_pred_stress))
 }
 
 ufeed_data <- load_ufeed_data(DATA_PATH)
@@ -272,13 +277,14 @@ ui <- fluidPage(
           label = "Current-season model",
           choices = c(
             "Ensemble model" = "ensemble",
-            "NN model" = "nn"
+            "NN model" = "nn",
+            "Ensemble model (stress)" = "stress"
           ),
           selected = "ensemble"
         ),
         div(
           class = "panel-note",
-          "The NN model theoretically has better extrapolation capacity under extreme conditions, but the ensemble model has higher accuracy in model training. This option only affects current-season data; historical data always uses the ensemble model."
+          "The ensemble model is the resulted model from normal model training. The NN model theoretically has better extrapolation capacity under extreme conditions. The Ensemble model (stress), is more sensitve to stress condition, and it is resulted from specialized model training. This option only affects current-season data; historical data always uses the ensemble model."
         ),
         
         radioButtons(
@@ -577,24 +583,39 @@ server <- function(input, output, session) {
     }
   })
   
-  plot_raw_data <- reactive({
-    req(input$model_type)
-    selected <- selected_locations()[1]
-    
-    filtered_for_controls() %>%
-      filter(location_id == selected) %>%
-      filter(Date >= x_min, Date <= x_max) %>%
-      mutate(
-        use_nn_model = source == CURRENT_SOURCE & input$model_type == "nn" & !is.na(y_pred_NN),
-        y_plot = if_else(use_nn_model, y_pred_NN, y_pred),
-        model_label = case_when(
-          source != CURRENT_SOURCE ~ "Historical data",
-          use_nn_model ~ "NN model",
-          TRUE ~ "Ensemble model"
-        )
-      ) %>%
-      filter(!is.na(y_plot))
-  })
+plot_raw_data <- reactive({
+  req(input$model_type)
+  selected <- selected_locations()[1]
+
+  filtered_for_controls() %>%
+    filter(location_id == selected) %>%
+    filter(Date >= x_min, Date <= x_max) %>%
+    mutate(
+      use_nn_model =
+        source == CURRENT_SOURCE &
+        input$model_type == "nn" &
+        !is.na(y_pred_NN),
+
+      use_stress_model =
+        source == CURRENT_SOURCE &
+        input$model_type == "stress" &
+        !is.na(y_pred_stress),
+
+      y_plot = dplyr::case_when(
+        use_nn_model ~ y_pred_NN,
+        use_stress_model ~ y_pred_stress,
+        TRUE ~ y_pred
+      ),
+
+      model_label = dplyr::case_when(
+        source != CURRENT_SOURCE ~ "Historical data",
+        use_nn_model ~ "NN model",
+        use_stress_model ~ "Stress-weighted model",
+        TRUE ~ "Ensemble model"
+      )
+    ) %>%
+    filter(!is.na(y_plot))
+})
   
   plot_data <- reactive({
     plot_raw_data() %>%
@@ -620,7 +641,11 @@ server <- function(input, output, session) {
   
   output$plot_subtitle <- renderText({
     type_label <- if (identical(input$ps_type, "0")) "pd" else "md"
-    model_label <- if (identical(input$model_type, "nn")) "current-season NN model" else "current-season ensemble model"
+    model_label <- dplyr::case_when(
+  identical(input$model_type, "nn") ~ "current-season NN model",
+  identical(input$model_type, "stress") ~ "current-season stress-weighted model",
+  TRUE ~ "current-season ensemble model"
+    )
     history_label <- if (identical(input$show_historical, "yes")) "historical data shown" else "historical data hidden"
     selected_id <- selected_locations()[1]
     loc <- all_locations %>% filter(location_id == selected_id) %>% slice(1)
