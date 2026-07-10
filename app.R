@@ -630,7 +630,7 @@ server <- function(input, output, session) {
     } else {
       paste0(
         "Selected location: Lon ", round(loc$lon[1], 4), ", Lat ", round(loc$lat[1], 4),
-        " ÃÂ· ", type_label, " ÃÂ· ", model_label, " ÃÂ· ", history_label
+        " · ", type_label, " · ", model_label, " · ", history_label
       )
     }
   })
