@@ -621,7 +621,7 @@ plot_raw_data <- reactive({
     plot_raw_data() %>%
       group_by(Date, source, ps_label, model_label, location_id, lon, lat) %>%
       summarise(
-        y_pred = mean(y_plot, na.rm = TRUE),
+        y_pred = min(y_plot, na.rm = TRUE),
         y_min_band = min(y_plot, na.rm = TRUE),
         y_max_band = max(y_plot, na.rm = TRUE),
         time_min = min_or_na(time_measured),
