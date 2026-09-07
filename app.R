@@ -718,7 +718,7 @@ plot_raw_data <- reactive({
       
       band_hover_text <- paste0(
         "<b>", htmlEscape(src), " selected-time band</b>",
-        "<br>Date: ", format(d$Date, "%Y-%m-%d"),
+        "<br>Date: ", format(d$Date, "%m-%d"),
         "<br>Water potential band: ", round(d$y_min_band, 3), " to ", round(d$y_max_band, 3),
         "<br>Mean predicted water potential: ", round(d$y_pred, 3),
         "<br>Time band: ", htmlEscape(d$time_band_label),
@@ -744,10 +744,10 @@ plot_raw_data <- reactive({
       
       hover_text <- paste0(
         "<b>", htmlEscape(unique(d$ps_label)[1]), "</b>",
-        "<br>Date: ", format(d$Date, "%Y-%m-%d"),
+        "<br>Date: ", format(d$Date, "%m-%d"),
         "<br>Mean predicted water potential: ", round(d$y_pred, 3),
         # "<br>Selected-time band: ", round(d$y_min_band, 3), " to ", round(d$y_max_band, 3),
-        "<br>Source: ", htmlEscape(src),
+        "<br>Year: ", htmlEscape(src),
         "<br>Time band: ", htmlEscape(d$time_band_label),
         "<br>Model: ", htmlEscape(d$model_label),
         "<br>Location: Lon ", round(d$lon, 4), ", Lat ", round(d$lat, 4),
