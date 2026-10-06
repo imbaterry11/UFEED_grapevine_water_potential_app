@@ -2,7 +2,7 @@
 "$schema" = "https://cdn.posit.co/publisher/schemas/posit-publishing-record-schema-v3.json"
 server_type = "connect_cloud"
 server_url = "https://connect.posit.cloud"
-client_version = "2.11.2"
+client_version = "2.13.5"
 created_at = "2026-06-22T19:36:51.823Z"
 type = "r-shiny"
 configuration_name = "UFEED_grapevine_water_potentia-4GBG"
@@ -10,7 +10,7 @@ id = "019ef0d6-c595-c549-7aa4-dba04fc907ae"
 dashboard_url = "https://connect.posit.cloud/plant-physiology-modeling/content/019ef0d6-c595-c549-7aa4-dba04fc907ae"
 direct_url = "https://019ef0d6-c595-c549-7aa4-dba04fc907ae.share.connect.posit.cloud"
 logs_url = "https://connect.posit.cloud/plant-physiology-modeling/content/019ef0d6-c595-c549-7aa4-dba04fc907ae/history"
-deployed_at = "2026-08-24T13:35:08.301Z"
+deployed_at = "2026-10-06T18:46:37.751Z"
 files = [
     ".posit/publish/UFEED_grapevine_water_potentia-4GBG.toml",
     ".posit/publish/deployments/deployment-9VU3.toml",
@@ -122,17 +122,6 @@ requirements = [
     "utils",
 ]
 hash = "f481f89daa906a34eab8ef8658c8a89c"
-
-[renv.packages.S7]
-package = "S7"
-version = "0.2.0"
-source = "Repository"
-repository = "CRAN"
-requirements = [
-    "R",
-    "utils",
-]
-hash = "5deb66b3ae702137e1f4162c11861e76"
 
 [renv.packages.askpass]
 package = "askpass"
@@ -463,25 +452,28 @@ hash = "15e9634c0fcd294799e9b2e929ed1b86"
 
 [renv.packages.ggplot2]
 package = "ggplot2"
-version = "4.0.2"
+version = "3.5.2"
 source = "Repository"
 repository = "CRAN"
 requirements = [
+    "MASS",
     "R",
-    "S7",
     "cli",
+    "glue",
     "grDevices",
     "grid",
     "gtable",
     "isoband",
     "lifecycle",
+    "mgcv",
     "rlang",
     "scales",
     "stats",
+    "tibble",
     "vctrs",
     "withr",
 ]
-hash = "24744d322a00a520db329287bf02ce42"
+hash = "7ad64861e028a777d7d67ff83231b548"
 
 [renv.packages.glue]
 package = "glue"

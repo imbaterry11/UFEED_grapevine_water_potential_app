@@ -222,8 +222,8 @@ ui <- fluidPage(
           div(class = "brand-title", "UFEED Grapevine Water Potential Explorer")
           # div(class = "brand-subtitle", "Grapevine water-potential explorer")
         )
-      ),
-      div(class = "today-pill", textOutput("today_text", inline = TRUE))
+      ) # Add a comma here when enabling today_text below.
+      # div(class = "today-pill", textOutput("today_text", inline = TRUE))
     ),
     
     div(
@@ -343,8 +343,8 @@ ui <- fluidPage(
             div(
               div(class = "card-title", "Predicted water potential progression"),
               div(class = "card-subtitle", textOutput("plot_subtitle", inline = TRUE))
-            ),
-            div(class = "card-badge", "Forecast shaded")
+            ) # Add a comma here when enabling the forecast badge below.
+            # div(class = "card-badge", "Forecast shaded")
           ),
           plotlyOutput("water_plot", height = "520px")
         )
@@ -368,9 +368,9 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   selected_locations <- reactiveVal(default_location_id)
   
-  output$today_text <- renderText({
-    paste("Today:", format(Sys.Date(), "%b %d, %Y"))
-  })
+  # output$today_text <- renderText({
+  #   paste("Today:", format(Sys.Date(), "%b %d, %Y"))
+  # })
   
   output$n_locations <- renderText({
     format(nrow(all_locations), big.mark = ",")
@@ -689,28 +689,28 @@ plot_raw_data <- reactive({
     y_min <- y_min - y_padding
     y_max <- y_max + y_padding
     
-    today <- Sys.Date()
+    # today <- Sys.Date()
     p <- plot_ly()
     
-    shade_start <- max(today, x_min)
-    
-    if (!is.na(shade_start) && shade_start <= x_max) {
-      p <- p %>%
-        add_trace(
-          x = as.Date(c(shade_start, x_max, x_max, shade_start)),
-          y = c(y_min, y_min, y_max, y_max),
-          type = "scatter",
-          mode = "none",
-          fill = "toself",
-          fillcolor = "rgba(15, 118, 110, 0.10)",
-          line = list(color = "rgba(15, 118, 110, 0)"),
-          text = rep("Forecast data", 4),
-          hoverinfo = "text",
-          name = "Forecast data",
-          showlegend = FALSE,
-          inherit = FALSE
-        )
-    }
+    # shade_start <- max(today, x_min)
+    #
+    # if (!is.na(shade_start) && shade_start <= x_max) {
+    #   p <- p %>%
+    #     add_trace(
+    #       x = as.Date(c(shade_start, x_max, x_max, shade_start)),
+    #       y = c(y_min, y_min, y_max, y_max),
+    #       type = "scatter",
+    #       mode = "none",
+    #       fill = "toself",
+    #       fillcolor = "rgba(15, 118, 110, 0.10)",
+    #       line = list(color = "rgba(15, 118, 110, 0)"),
+    #       text = rep("Forecast data", 4),
+    #       hoverinfo = "text",
+    #       name = "Forecast data",
+    #       showlegend = FALSE,
+    #       inherit = FALSE
+    #     )
+    # }
     
     for (src in source_levels) {
       d <- dat %>% filter(source == src) %>% arrange(Date)
@@ -779,31 +779,31 @@ plot_raw_data <- reactive({
         )
     }
     
-    shapes <- list()
-    annotations <- list()
-    
-    if (!is.na(today) && today >= x_min && today <= x_max) {
-      shapes <- append(shapes, list(list(
-        type = "line",
-        x0 = as.character(today),
-        x1 = as.character(today),
-        y0 = 0,
-        y1 = 1,
-        yref = "paper",
-        line = list(color = "rgba(239, 68, 68, 0.95)", width = 2, dash = "dot")
-      )))
-      
-      annotations <- append(annotations, list(list(
-        x = as.character(today),
-        y = 1,
-        yref = "paper",
-        text = "Today",
-        showarrow = FALSE,
-        xanchor = "left",
-        yanchor = "bottom",
-        font = list(color = "black", size = 12)
-      )))
-    }
+    # shapes <- list()
+    # annotations <- list()
+    #
+    # if (!is.na(today) && today >= x_min && today <= x_max) {
+    #   shapes <- append(shapes, list(list(
+    #     type = "line",
+    #     x0 = as.character(today),
+    #     x1 = as.character(today),
+    #     y0 = 0,
+    #     y1 = 1,
+    #     yref = "paper",
+    #     line = list(color = "rgba(239, 68, 68, 0.95)", width = 2, dash = "dot")
+    #   )))
+    #
+    #   annotations <- append(annotations, list(list(
+    #     x = as.character(today),
+    #     y = 1,
+    #     yref = "paper",
+    #     text = "Today",
+    #     showarrow = FALSE,
+    #     xanchor = "left",
+    #     yanchor = "bottom",
+    #     font = list(color = "black", size = 12)
+    #   )))
+    # }
     
     p %>%
       layout(
@@ -867,10 +867,10 @@ plot_raw_data <- reactive({
           
           zeroline = FALSE,
           automargin = TRUE
-        ),
-        
-        shapes = shapes,
-        annotations = annotations
+        )
+        # Add a comma after yaxis above when enabling these options.
+        # shapes = shapes,
+        # annotations = annotations
       ) %>%
       config(displaylogo = FALSE, responsive = TRUE)
   })
