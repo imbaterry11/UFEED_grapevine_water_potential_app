@@ -41,12 +41,14 @@ CURRENT_SOURCE <- Sys.getenv(
   unset = "2026"
 )
 
-download.file(
-  url = DATA_URL,
-  destfile = DATA_PATH,
-  mode = "wb",
-  quiet = FALSE
-)
+# Use the bundled season dataset so startup does not depend on Nextcloud.
+# Re-enable this download when resuming live data updates.
+# download.file(
+#   url = DATA_URL,
+#   destfile = DATA_PATH,
+#   mode = "wb",
+#   quiet = FALSE
+# )
 
 format_time_label <- function(x) {
   dplyr::case_when(
